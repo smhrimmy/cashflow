@@ -1,29 +1,69 @@
 'use client';
 
-import { Settings as SettingsIcon, Save, Key, Server, Webhook } from 'lucide-react';
-import { useState } from 'react';
+import { Settings as SettingsIcon, Save, Key, Server, Webhook, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { fetchSettings, updateSettings } from '@/lib/api';
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('general');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    openaiKey: 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    wpUrl: 'https://mysite.com/wp-json',
-    wpUser: 'admin',
-    wpPass: '••••••••••••••••',
-    telegramToken: '••••••••••••••••',
-    twitterKey: '••••••••••••••••',
-    pinterestToken: '••••••••••••••••',
-    stripeSecret: 'sk_live_xxxxxxxxxxxxxxxx',
+    openaiKey: '',
+    wpUrl: '',
+    wpUser: '',
+    wpPass: '',
+    telegramToken: '',
+    twitterKey: '',
+    pinterestToken: '',
+    stripeSecret: '',
+    autoPostEnabled: true,
+    trafficAutomation: true
   });
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { settings } = await fetchSettings();
+        setFormData({
+          ...formData,
+          ...settings,
+          autoPostEnabled: settings.autoPostEnabled === 'true',
+          trafficAutomation: settings.trafficAutomation === 'true'
+        });
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleToggle = (name: string) => {
+    setFormData({ ...formData, [name]: !formData[name as keyof typeof formData] });
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Settings saved successfully!');
+    setIsSaving(true);
+    try {
+      await updateSettings({
+        ...formData,
+        autoPostEnabled: formData.autoPostEnabled.toString(),
+        trafficAutomation: formData.trafficAutomation.toString()
+      });
+      alert('Settings saved successfully!');
+    } catch (error) {
+      alert('Failed to save settings. Check backend connection.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -40,9 +80,10 @@ export default function Settings() {
         </div>
         <button 
           onClick={handleSave}
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 w-full md:w-auto"
+          disabled={isLoading || isSaving}
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 w-full md:w-auto"
         >
-          <Save className="w-4 h-4" />
+          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save Settings
         </button>
       </div>
@@ -79,7 +120,7 @@ export default function Settings() {
                     <p className="text-sm text-slate-400">Run the daily CRON job automatically</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
+                    <input type="checkbox" className="sr-only peer" checked={formData.autoPostEnabled} onChange={() => handleToggle('autoPostEnabled')} />
                     <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
                   </label>
                 </div>
@@ -89,7 +130,7 @@ export default function Settings() {
                     <p className="text-sm text-slate-400">Auto-post to social media (Twitter, Pinterest, Telegram)</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
+                    <input type="checkbox" className="sr-only peer" checked={formData.trafficAutomation} onChange={() => handleToggle('trafficAutomation')} />
                     <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
                   </label>
                 </div>

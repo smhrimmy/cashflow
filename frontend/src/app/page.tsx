@@ -6,7 +6,8 @@ import {
   Users, 
   Activity, 
   ArrowUpRight, 
-  ArrowDownRight 
+  ArrowDownRight,
+  Loader2
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -18,18 +19,37 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { clsx } from 'clsx';
-
-const data = [
-  { name: 'Mon', revenue: 4000, traffic: 2400 },
-  { name: 'Tue', revenue: 3000, traffic: 1398 },
-  { name: 'Wed', revenue: 2000, traffic: 9800 },
-  { name: 'Thu', revenue: 2780, traffic: 3908 },
-  { name: 'Fri', revenue: 1890, traffic: 4800 },
-  { name: 'Sat', revenue: 2390, traffic: 3800 },
-  { name: 'Sun', revenue: 3490, traffic: 4300 },
-];
+import { useState, useEffect } from 'react';
+import { fetchDashboardStats } from '@/lib/api';
 
 export default function Dashboard() {
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const { stats, chartData, topPosts } = await fetchDashboardStats();
+        setData({ stats, chartData, topPosts });
+      } catch (error) {
+        console.error('Failed to load dashboard stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadStats();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!data) return <div className="text-center text-slate-400 mt-10">Failed to load data. Is the backend running?</div>;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
@@ -49,30 +69,30 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Total Earnings" 
-          value="$12,450" 
-          trend="+14.5%" 
-          isPositive={true}
+          value={data.stats.totalEarnings} 
+          trend={data.stats.earningsTrend} 
+          isPositive={data.stats.earningsTrend.startsWith('+')}
           icon={<DollarSign className="w-5 h-5 text-green-400" />}
         />
         <StatCard 
           title="Monthly Traffic" 
-          value="48.2K" 
-          trend="+5.2%" 
-          isPositive={true}
+          value={data.stats.monthlyTraffic} 
+          trend={data.stats.trafficTrend} 
+          isPositive={data.stats.trafficTrend.startsWith('+')}
           icon={<Users className="w-5 h-5 text-blue-400" />}
         />
         <StatCard 
           title="Conversion Rate" 
-          value="3.8%" 
-          trend="-1.2%" 
-          isPositive={false}
+          value={data.stats.conversionRate} 
+          trend={data.stats.conversionTrend} 
+          isPositive={data.stats.conversionTrend.startsWith('+')}
           icon={<Activity className="w-5 h-5 text-purple-400" />}
         />
         <StatCard 
           title="Active Posts" 
-          value="1,204" 
-          trend="+12" 
-          isPositive={true}
+          value={data.stats.activePosts} 
+          trend={data.stats.postsTrend} 
+          isPositive={data.stats.postsTrend.startsWith('+')}
           icon={<TrendingUp className="w-5 h-5 text-orange-400" />}
         />
       </div>
@@ -83,7 +103,7 @@ export default function Dashboard() {
           <h3 className="text-lg font-semibold mb-6">Revenue & Traffic Trend</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
-              <AreaChart data={data}>
+              <AreaChart data={data.chartData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
@@ -92,7 +112,7 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => '$' + value} />
+                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value: number) => '$' + value} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
                 />
@@ -106,12 +126,7 @@ export default function Dashboard() {
         <div className="glass-card p-6">
           <h3 className="text-lg font-semibold mb-6">Top Performing Posts</h3>
           <div className="space-y-4">
-            {[
-              { title: 'Best AI Tools for 2026', earnings: '$450', clicks: '1.2k' },
-              { title: 'Automated SaaS Guide', earnings: '$320', clicks: '856' },
-              { title: 'Passive Income Strategies', earnings: '$280', clicks: '645' },
-              { title: 'ClickBank Review 2026', earnings: '$190', clicks: '420' },
-            ].map((post, i) => (
+            {data.topPosts.map((post: any, i: number) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 transition-colors border border-transparent hover:border-slate-700">
                 <div className="overflow-hidden">
                   <p className="text-sm font-medium truncate w-32 md:w-40">{post.title}</p>
@@ -129,7 +144,7 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, trend, isPositive, icon }: any) {
+function StatCard({ title, value, trend, isPositive, icon }: { title: string, value: string, trend: string, isPositive: boolean, icon: React.ReactNode }) {
   return (
     <div className="glass-card p-6 relative overflow-hidden group">
       <div className="flex justify-between items-start mb-4">

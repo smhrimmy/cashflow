@@ -34,3 +34,4 @@ backend/.env
 # Typescript
 *.tsbuildinfo
 next-env.d.ts
+.vercel
